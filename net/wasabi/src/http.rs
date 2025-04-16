@@ -1,6 +1,7 @@
 extern crate alloc;
 use alloc::string::String;
 use noli::net::{lookup_host, SocketAddr, TcpStream};
+use noli::print;
 use saba_core::error::Error;
 use saba_core::http::HttpResponse;
 pub struct HttpClient {}
@@ -79,10 +80,15 @@ impl HttpClient {
         // --------------------------------
         request.push_str("Connection: close\n");
 
+        // ここ削ると408が見れる。確かに RFC で指定された CRLF が存在しない形になるので
+        request.push_str("\r\n");
+
         let _bytes = match stream.write(request.as_bytes()) {
             Ok(bytes) => bytes,
             Err(_) => return Err(Error::Network(String::from("Failed to send a request to TCP stream"))),
         };
+
+        print!("write done!\n\n\n");
 
         let mut received = alloc::vec::Vec::new();
 
@@ -97,6 +103,8 @@ impl HttpClient {
             }
             received.extend_from_slice(&buf[..bytes_read]);
         }
+
+        print!("read done!\n\n\n");
 
         match String::from_utf8(received) {
             Ok(result) =>         HttpResponse::new(result),
