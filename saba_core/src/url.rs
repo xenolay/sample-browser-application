@@ -1,3 +1,5 @@
+use alloc::string::{String, ToString};
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Url {
     url: String,
