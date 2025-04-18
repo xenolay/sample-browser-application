@@ -22,3 +22,27 @@ pub enum HtmlToken {
 
     Eof,
 }
+
+// [] 13.2.5 Tokenization | HTML Standard
+// https://html.spec.whatwg.org/multipage/parsing.html#tokenization
+// ↑ で規定のある State の一部を実装する。本当は80種類あるのだが、全部実装すると日が暮れる……
+pub enum TokenizationState {
+    Data, // https://html.spec.whatwg.org/multipage/parsing.html#data-state
+    TagOpen, // https://html.spec.whatwg.org/multipage/parsing.html#tag-open-state
+    EndTagOpen, // https://html.spec.whatwg.org/multipage/parsing.html#end-tag-open-state
+    TagName, // https://html.spec.whatwg.org/multipage/parsing.html#tag-name-state
+    BeforeAttributeName, // https://html.spec.whatwg.org/multipage/parsing.html#script-data-end-tag-name-state
+    AttributeName, // https://html.spec.whatwg.org/multipage/parsing.html#attribute-name-state
+    AfterAttributeName, // https://html.spec.whatwg.org/multipage/parsing.html#after-attribute-name-state
+    BeforeAttributeValue, // https://html.spec.whatwg.org/multipage/parsing.html#before-attribute-value-state
+    AttributeValueDoubleQuoted, // https://html.spec.whatwg.org/multipage/parsing.html#attribute-value-(double-quoted)-state
+    AttributeValueSingleQuoted, // https://html.spec.whatwg.org/multipage/parsing.html#attribute-value-(single-quoted)-state
+    AttributeValueUnQuoted, // https://html.spec.whatwg.org/multipage/parsing.html#attribute-value-(unquoted)-state
+    AfterAttributeValueQuoted, // https://html.spec.whatwg.org/multipage/parsing.html#after-attribute-value-(quoted)-state
+    SelfClosingStartTag, // https://html.spec.whatwg.org/multipage/parsing.html#self-closing-start-tag-state
+    ScriptData, // https://html.spec.whatwg.org/multipage/parsing.html#script-data-state
+    ScriptDataLessThanSign, // https://html.spec.whatwg.org/multipage/parsing.html#tag-name-state
+    ScriptDataEndTagOpen, // https://html.spec.whatwg.org/multipage/parsing.html#script-data-end-tag-open-state
+    ScriptDataEndTagName, // https://html.spec.whatwg.org/multipage/parsing.html#script-data-end-tag-name-state
+    TemporaryBuffer, // whatwg 上で規定はないが、実装を簡単にするために実装する
+}
