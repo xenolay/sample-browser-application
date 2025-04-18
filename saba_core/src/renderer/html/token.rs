@@ -26,7 +26,7 @@ pub enum HtmlToken {
 // [] 13.2.5 Tokenization | HTML Standard
 // https://html.spec.whatwg.org/multipage/parsing.html#tokenization
 // ↑ で規定のある State の一部を実装する。本当は80種類あるのだが、全部実装すると日が暮れる……
-pub enum TokenizationState {
+pub enum TokenizerState {
     Data, // https://html.spec.whatwg.org/multipage/parsing.html#data-state
     TagOpen, // https://html.spec.whatwg.org/multipage/parsing.html#tag-open-state
     EndTagOpen, // https://html.spec.whatwg.org/multipage/parsing.html#end-tag-open-state
@@ -48,7 +48,7 @@ pub enum TokenizationState {
 }
 
 pub struct HtmlTokenizer {
-    state: TokenizationState,
+    state: TokenizerState,
     pos: usize,
     reconsume: bool,
     latest_token: Option<HtmlToken>,
@@ -59,7 +59,7 @@ pub struct HtmlTokenizer {
 impl HtmlTokenizer {
     pub fn new(html: String) -> Self {
         Self {
-            state: TokenizationState::Data,
+            state: TokenizerState::Data,
             pos: 0,
             reconsume: false,
             latest_token: None,
@@ -90,9 +90,9 @@ impl Iterator for HtmlTokenizer {
         loop {
             let c = self.consume_next_character();
             match self.state {
-                TokenizationState::Data => {
+                TokenizerState::Data => {
                     if c == '<' {
-                        self.state = TokenizationState::TagOpen;
+                        self.state = TokenizerState::TagOpen;
                         continue
                     }
 
@@ -102,23 +102,23 @@ impl Iterator for HtmlTokenizer {
 
                     return Some(HtmlToken::Char(c));
                 },
-                TokenizationState::TagOpen => todo!(),
-                TokenizationState::EndTagOpen => todo!(),
-                TokenizationState::TagName => todo!(),
-                TokenizationState::BeforeAttributeName => todo!(),
-                TokenizationState::AttributeName => todo!(),
-                TokenizationState::AfterAttributeName => todo!(),
-                TokenizationState::BeforeAttributeValue => todo!(),
-                TokenizationState::AttributeValueDoubleQuoted => todo!(),
-                TokenizationState::AttributeValueSingleQuoted => todo!(),
-                TokenizationState::AttributeValueUnQuoted => todo!(),
-                TokenizationState::AfterAttributeValueQuoted => todo!(),
-                TokenizationState::SelfClosingStartTag => todo!(),
-                TokenizationState::ScriptData => todo!(),
-                TokenizationState::ScriptDataLessThanSign => todo!(),
-                TokenizationState::ScriptDataEndTagOpen => todo!(),
-                TokenizationState::ScriptDataEndTagName => todo!(),
-                TokenizationState::TemporaryBuffer => todo!(),
+                TokenizerState::TagOpen => todo!(),
+                TokenizerState::EndTagOpen => todo!(),
+                TokenizerState::TagName => todo!(),
+                TokenizerState::BeforeAttributeName => todo!(),
+                TokenizerState::AttributeName => todo!(),
+                TokenizerState::AfterAttributeName => todo!(),
+                TokenizerState::BeforeAttributeValue => todo!(),
+                TokenizerState::AttributeValueDoubleQuoted => todo!(),
+                TokenizerState::AttributeValueSingleQuoted => todo!(),
+                TokenizerState::AttributeValueUnQuoted => todo!(),
+                TokenizerState::AfterAttributeValueQuoted => todo!(),
+                TokenizerState::SelfClosingStartTag => todo!(),
+                TokenizerState::ScriptData => todo!(),
+                TokenizerState::ScriptDataLessThanSign => todo!(),
+                TokenizerState::ScriptDataEndTagOpen => todo!(),
+                TokenizerState::ScriptDataEndTagName => todo!(),
+                TokenizerState::TemporaryBuffer => todo!(),
             }
         }
     }
