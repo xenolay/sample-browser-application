@@ -6,7 +6,7 @@ use crate::renderer::html::html_tag_attribute::{AttributeField, HtmlTagAttribute
 // ----- Cited From Reference -----
 // The output of the tokenization step is a series of zero or more of the following tokens: DOCTYPE, start tag, end tag, comment, character, end-of-file. DOCTYPE tokens have a name, a public identifier, a system identifier, and a force-quirks flag. When a DOCTYPE token is created, its name, public identifier, and system identifier must be marked as missing (which is a distinct state from the empty string), and the force-quirks flag must be set to off (its other state is on). Start and end tag tokens have a tag name, a self-closing flag, and a list of attributes, each of which has a name and a value. When a start or end tag token is created, its self-closing flag must be unset (its other state is that it be set), and its attributes list must be empty. Comment and character tokens have data.
 // --------------------------------
-#[derive(Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HtmlToken {
     // ...↑のように書いてはあるが、このブラウザでは DOCTYPE token と comment token は実装しない。
     StartTag {
@@ -472,6 +472,120 @@ impl Iterator for HtmlTokenizer {
                     return Some(HtmlToken::Char(c));
                 },
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::alloc::string::ToString;
+    use alloc::vec;
+
+    #[test]
+    fn test_empty() {
+        let html = "".to_string();
+        let mut tokenizer = HtmlTokenizer::new(html);
+        assert!(tokenizer.next().is_none());
+    }
+
+    #[test]
+    fn test_start_and_end_tag() {
+        let html = "<body></body>".to_string();
+        let mut tokenizer = HtmlTokenizer::new(html);
+        let expected = [
+            HtmlToken::StartTag {
+                tag: "body".to_string(),
+                self_closing: false,
+                attributes: Vec::new(),
+            },
+            HtmlToken::EndTag {
+                tag: "body".to_string(),
+            },
+        ];
+        for e in expected {
+            assert_eq!(Some(e), tokenizer.next());
+        }
+    }
+
+    #[test]
+    fn test_attributes() {
+        let html = "<p class=\"A\" id='B' foo=bar></p>".to_string();
+        let mut tokenizer = HtmlTokenizer::new(html);
+        let mut attr1 = HtmlTagAttribute::new();
+        attr1.add_char('c', AttributeField::Name);
+        attr1.add_char('l', AttributeField::Name);
+        attr1.add_char('a', AttributeField::Name);
+        attr1.add_char('s', AttributeField::Name);
+        attr1.add_char('s', AttributeField::Name);
+        attr1.add_char('A', AttributeField::Value);
+
+        let mut attr2 = HtmlTagAttribute::new();
+        attr2.add_char('i', AttributeField::Name);
+        attr2.add_char('d', AttributeField::Name);
+        attr2.add_char('B', AttributeField::Value);
+
+        let mut attr3 = HtmlTagAttribute::new();
+        attr3.add_char('f', AttributeField::Name);
+        attr3.add_char('o', AttributeField::Name);
+        attr3.add_char('o', AttributeField::Name);
+        attr3.add_char('b', AttributeField::Value);
+        attr3.add_char('a', AttributeField::Value);
+        attr3.add_char('r', AttributeField::Value);
+
+        let expected = [
+            HtmlToken::StartTag {
+                tag: "p".to_string(),
+                self_closing: false,
+                attributes: vec![attr1, attr2, attr3],
+            },
+            HtmlToken::EndTag {
+                tag: "p".to_string(),
+            },
+        ];
+        for e in expected {
+            assert_eq!(Some(e), tokenizer.next());
+        }
+    }
+
+    #[test]
+    fn test_self_closing_tag() {
+        let html = "<img />".to_string();
+        let mut tokenizer = HtmlTokenizer::new(html);
+        let expected = [HtmlToken::StartTag {
+            tag: "img".to_string(),
+            self_closing: true,
+            attributes: Vec::new(),
+        }];
+        for e in expected {
+            assert_eq!(Some(e), tokenizer.next());
+        }
+    }
+
+    #[test]
+    fn test_script_tag() {
+        let html = "<script>js code;</script>".to_string();
+        let mut tokenizer = HtmlTokenizer::new(html);
+        let expected = [
+            HtmlToken::StartTag {
+                tag: "script".to_string(),
+                self_closing: false,
+                attributes: Vec::new(),
+            },
+            HtmlToken::Char('j'),
+            HtmlToken::Char('s'),
+            HtmlToken::Char(' '),
+            HtmlToken::Char('c'),
+            HtmlToken::Char('o'),
+            HtmlToken::Char('d'),
+            HtmlToken::Char('e'),
+            HtmlToken::Char(';'),
+            HtmlToken::EndTag {
+                tag: "script".to_string(),
+            },
+        ];
+        for e in expected {
+            assert_eq!(Some(e), tokenizer.next());
         }
     }
 }
