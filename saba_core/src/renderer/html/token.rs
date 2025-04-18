@@ -46,3 +46,58 @@ pub enum TokenizationState {
     ScriptDataEndTagName, // https://html.spec.whatwg.org/multipage/parsing.html#script-data-end-tag-name-state
     TemporaryBuffer, // whatwg 上で規定はないが、実装を簡単にするために実装する
 }
+
+pub struct HtmlTokenizer {
+    state: TokenizationState,
+    pos: usize,
+    reconsume: bool,
+    latest_token: Option<HtmlToken>,
+    input: Vec<char>,
+    buf: String,
+}
+
+impl HtmlTokenizer {
+    pub fn new(html: String) -> Self {
+        Self {
+            state: TokenizationState::Data,
+            pos: 0,
+            reconsume: false,
+            latest_token: None,
+            input: html.chars().collect(),
+            buf: String::new(),
+        }
+    }
+}
+
+impl Iterator for HtmlTokenizer {
+    type Item = HtmlToken;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.pos >= self.input.len() {
+            return None
+        }
+
+        loop {
+            match self.state {
+                TokenizationState::Data => todo!(),
+                TokenizationState::TagOpen => todo!(),
+                TokenizationState::EndTagOpen => todo!(),
+                TokenizationState::TagName => todo!(),
+                TokenizationState::BeforeAttributeName => todo!(),
+                TokenizationState::AttributeName => todo!(),
+                TokenizationState::AfterAttributeName => todo!(),
+                TokenizationState::BeforeAttributeValue => todo!(),
+                TokenizationState::AttributeValueDoubleQuoted => todo!(),
+                TokenizationState::AttributeValueSingleQuoted => todo!(),
+                TokenizationState::AttributeValueUnQuoted => todo!(),
+                TokenizationState::AfterAttributeValueQuoted => todo!(),
+                TokenizationState::SelfClosingStartTag => todo!(),
+                TokenizationState::ScriptData => todo!(),
+                TokenizationState::ScriptDataLessThanSign => todo!(),
+                TokenizationState::ScriptDataEndTagOpen => todo!(),
+                TokenizationState::ScriptDataEndTagName => todo!(),
+                TokenizationState::TemporaryBuffer => todo!(),
+            }
+        }
+    }
+}
