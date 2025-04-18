@@ -6,6 +6,7 @@ use crate::renderer::html::html_tag_attribute::HtmlTagAttribute;
 // ----- Cited From Reference -----
 // The output of the tokenization step is a series of zero or more of the following tokens: DOCTYPE, start tag, end tag, comment, character, end-of-file. DOCTYPE tokens have a name, a public identifier, a system identifier, and a force-quirks flag. When a DOCTYPE token is created, its name, public identifier, and system identifier must be marked as missing (which is a distinct state from the empty string), and the force-quirks flag must be set to off (its other state is on). Start and end tag tokens have a tag name, a self-closing flag, and a list of attributes, each of which has a name and a value. When a start or end tag token is created, its self-closing flag must be unset (its other state is that it be set), and its attributes list must be empty. Comment and character tokens have data.
 // --------------------------------
+#[derive(Clone)]
 pub enum HtmlToken {
     // ...↑のように書いてはあるが、このブラウザでは DOCTYPE token と comment token は実装しない。
     StartTag {
@@ -26,6 +27,7 @@ pub enum HtmlToken {
 // [] 13.2.5 Tokenization | HTML Standard
 // https://html.spec.whatwg.org/multipage/parsing.html#tokenization
 // ↑ で規定のある State の一部を実装する。本当は80種類あるのだが、全部実装すると日が暮れる……
+#[derive(Clone)]
 pub enum TokenizerState {
     Data, // https://html.spec.whatwg.org/multipage/parsing.html#data-state
     TagOpen, // https://html.spec.whatwg.org/multipage/parsing.html#tag-open-state
@@ -47,6 +49,7 @@ pub enum TokenizerState {
     TemporaryBuffer, // whatwg 上で規定はないが、実装を簡単にするために実装する
 }
 
+#[derive(Clone)]
 pub struct HtmlTokenizer {
     state: TokenizerState,
     pos: usize,
@@ -103,6 +106,27 @@ impl HtmlTokenizer {
         self.latest_token = Some(
             HtmlToken::EndTag { tag: String::new() }
         )
+    }
+
+    fn append_tag_name(&mut self, c: char) {
+        assert!(self.latest_token.is_some())
+
+        if let Some(t) = self.latest_token.as_mut() {
+            match t {
+                HtmlToken::StartTag { tag, self_closing: _, attributes: _ } | HtmlToken::EndTag { tag } => tag.push(c),
+                _ => panic!("latest_token must be either StartTag or EndTag"),
+            }
+        }
+    }
+
+    fn emit_latest_token(&mut self) -> Option<HtmlToken> {
+        assert!(self.latest_token.is_some());
+
+        let t = self.latest_token.as_ref().cloned();
+        self.latest_token = None;
+        assert!(self.latest_token.is_none());
+
+        t
     }
 }
 
@@ -163,7 +187,34 @@ impl Iterator for HtmlTokenizer {
 
                     // 本当は > とかが来たらパースエラーにする必要があるのだが、本に沿っていったんこのままにする
                 },
-                TokenizerState::TagName => todo!(),
+                TokenizerState::TagName => {
+                    if c == ' ' { // 本当は tab, LF, FF もこの枝
+                        self.state = TokenizerState::BeforeAttributeName;
+                        continue;
+                    }
+
+                    if c == '/' {
+                        self.state = TokenizerState::SelfClosingStartTag;
+                        continue;
+                    }
+
+                    if c == '>' {
+                        self.state = TokenizerState::Data;
+                        return self.emit_latest_token();
+                    }
+
+                    if c.is_ascii_uppercase() {
+                        self.append_tag_name(c.to_ascii_lowercase());
+                        continue;
+                    }
+
+                    if self.is_eof() {
+                        return Some(HtmlToken::Eof);
+                    }
+
+                    // 本当は NULL 文字は U+FFFD に変換するがめんどいのでそのまま
+                    self.append_tag_name(c);
+                },
                 TokenizerState::BeforeAttributeName => todo!(),
                 TokenizerState::AttributeName => todo!(),
                 TokenizerState::AfterAttributeName => todo!(),
