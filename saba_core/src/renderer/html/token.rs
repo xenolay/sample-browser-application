@@ -421,7 +421,17 @@ impl Iterator for HtmlTokenizer {
 
                     return Some(HtmlToken::Char(c));
                 },
-                TokenizerState::ScriptDataLessThanSign => todo!(),
+                TokenizerState::ScriptDataLessThanSign => {
+                    if c == '/' {
+                        self.buf = String::new();
+                        self.state = TokenizerState::ScriptDataEndTagOpen;
+                        continue;
+                    }
+
+                    self.reconsume = true;
+                    self.state = TokenizerState::ScriptData;
+                    return Some(HtmlToken::Char('<'));
+                },
                 TokenizerState::ScriptDataEndTagOpen => todo!(),
                 TokenizerState::ScriptDataEndTagName => todo!(),
                 TokenizerState::TemporaryBuffer => todo!(),
