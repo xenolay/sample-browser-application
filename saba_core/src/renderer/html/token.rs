@@ -139,6 +139,22 @@ impl HtmlTokenizer {
             }
         }
     }
+
+    fn append_character_to_attribute(&mut self, c: char, field: AttributeField) {
+        assert!(self.latest_token.is_some());
+
+        if let Some(t) = self.latest_token.as_mut() {
+            match t {
+                HtmlToken::StartTag { tag: _, self_closing: _, attributes } => {
+                    let len = attributes.len();
+                    assert!(len > 0);
+
+                    attributes[len - 1].add_char(c, field)
+                },
+                _ => panic!("latest_token should be StartTag"),
+            }
+        }
+    }
 }
 
 impl Iterator for HtmlTokenizer {
@@ -239,7 +255,25 @@ impl Iterator for HtmlTokenizer {
 
                     // 本当は = の場合は別の処理がある  とか space を無視するとか色々ある
                 },
-                TokenizerState::AttributeName => todo!(),
+                TokenizerState::AttributeName => {
+                    if c == ' ' || c == '/' || c == '>' || self.is_eof() {
+                        self.reconsume = true;
+                        self.state = TokenizerState::AfterAttributeName;
+                        continue;
+                    }
+
+                    if c == '=' {
+                        self.state = TokenizerState::BeforeAttributeValue;
+                        continue;
+                    }
+
+                    if c.is_ascii_uppercase() {
+                        self.append_character_to_attribute(c.to_ascii_lowercase(), AttributeField::Name);
+                        continue;
+                    }
+
+                    self.append_character_to_attribute(c, AttributeField::Name);
+                },
                 TokenizerState::AfterAttributeName => todo!(),
                 TokenizerState::BeforeAttributeValue => todo!(),
                 TokenizerState::AttributeValueDoubleQuoted => todo!(),
