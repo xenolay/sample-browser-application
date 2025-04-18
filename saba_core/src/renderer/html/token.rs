@@ -134,7 +134,7 @@ impl HtmlTokenizer {
 
         if let Some(t) = self.latest_token.as_mut() {
             match t {
-                HtmlToken::StartTag { tag: _, self_closing: _, attributes: attributes } => attributes.push(HtmlTagAttribute::new()),
+                HtmlToken::StartTag { tag: _, self_closing: _, attributes } => attributes.push(HtmlTagAttribute::new()),
                 _ => panic!("latest_token must be StartTag"),
             }
         }
