@@ -149,7 +149,20 @@ impl Iterator for HtmlTokenizer {
                     self.reconsume = true;
                     self.state = TokenizerState::Data
                 },
-                TokenizerState::EndTagOpen => todo!(),
+                TokenizerState::EndTagOpen => {
+                    if self.is_eof() {
+                        // 本当はパースエラーにする必要がある
+                        return Some(HtmlToken::Eof);
+                    }
+
+                    if c.is_ascii_alphabetic() {
+                        self.reconsume = true;
+                        self.state = TokenizerState::TagName;
+                        self.create_end_tag();
+                    }
+
+                    // 本当は > とかが来たらパースエラーにする必要があるのだが、本に沿っていったんこのままにする
+                },
                 TokenizerState::TagName => todo!(),
                 TokenizerState::BeforeAttributeName => todo!(),
                 TokenizerState::AttributeName => todo!(),
