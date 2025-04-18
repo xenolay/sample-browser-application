@@ -1,5 +1,5 @@
 use alloc::{string::String, vec::Vec};
-use crate::renderer::html::html_tag_attribute::HtmlTagAttribute;
+use crate::renderer::html::html_tag_attribute::{AttributeField, HtmlTagAttribute};
 
 // [] 13.2.5 Tokenization | HTML Standard
 // https://html.spec.whatwg.org/multipage/parsing.html#tokenization
@@ -109,7 +109,7 @@ impl HtmlTokenizer {
     }
 
     fn append_tag_name(&mut self, c: char) {
-        assert!(self.latest_token.is_some())
+        assert!(self.latest_token.is_some());
 
         if let Some(t) = self.latest_token.as_mut() {
             match t {
@@ -127,6 +127,17 @@ impl HtmlTokenizer {
         assert!(self.latest_token.is_none());
 
         t
+    }
+
+    fn start_new_attribute(&mut self) {
+        assert!(self.latest_token.is_some());
+
+        if let Some(t) = self.latest_token.as_mut() {
+            match t {
+                HtmlToken::StartTag { tag: _, self_closing: _, attributes: attributes } => attributes.push(HtmlTagAttribute::new()),
+                _ => panic!("latest_token must be StartTag"),
+            }
+        }
     }
 }
 
@@ -215,7 +226,19 @@ impl Iterator for HtmlTokenizer {
                     // 本当は NULL 文字は U+FFFD に変換するがめんどいのでそのまま
                     self.append_tag_name(c);
                 },
-                TokenizerState::BeforeAttributeName => todo!(),
+                TokenizerState::BeforeAttributeName => {
+                    if c == '/' || c == '>' || self.is_eof() {
+                        self.reconsume = true;
+                        self.state = TokenizerState::AfterAttributeName;
+                        continue;
+                    }
+
+                    self.reconsume = true;
+                    self.state = TokenizerState::AttributeName;
+                    self.start_new_attribute();
+
+                    // 本当は = の場合は別の処理がある  とか space を無視するとか色々ある
+                },
                 TokenizerState::AttributeName => todo!(),
                 TokenizerState::AfterAttributeName => todo!(),
                 TokenizerState::BeforeAttributeValue => todo!(),
