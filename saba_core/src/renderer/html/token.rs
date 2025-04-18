@@ -442,7 +442,23 @@ impl Iterator for HtmlTokenizer {
                     self.state = TokenizerState::ScriptData;
                     return Some(HtmlToken::Char('<')); // 本来は </ を返さないといけない
                 },
-                TokenizerState::ScriptDataEndTagName => todo!(),
+                TokenizerState::ScriptDataEndTagName => {
+                    if c == '>' {
+                        self.state = TokenizerState::Data;
+                        return self.emit_latest_token();
+                    }
+
+                    if c.is_ascii_alphabetic() {
+                        self.buf.push(c);
+                        self.append_tag_name(c.to_ascii_lowercase());
+                        continue;
+                    }
+
+                    self.state = TokenizerState::TemporaryBuffer;
+                    self.buf = String::from("</") + &self.buf;
+                    self.buf.push(c);
+                    continue;
+                },
                 TokenizerState::TemporaryBuffer => todo!(),
             }
         }
