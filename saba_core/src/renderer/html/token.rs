@@ -73,9 +73,36 @@ impl HtmlTokenizer {
     }
 
     fn consume_next_character(&mut self) -> char {
-        let c = self.input[self.pos];
+        let c = if self.reconsume {
+            // [] 13.2.5.4 Script data state | HTML Standard
+            // https://html.spec.whatwg.org/multipage/parsing.html#script-data-state
+            // ----- Cited From Reference -----
+            // When a state says to reconsume a matched character in a specified state, that means to switch to that state, but when it attempts to consume the next input character, provide it with the current input character instead.
+            // --------------------------------
+            // [] current input character | HTML Standard
+            // https://html.spec.whatwg.org/multipage/parsing.html#current-input-character
+            // ----- Cited From Reference -----
+            //  The current input character is the last character to have been consumed.
+            // --------------------------------
+            self.reconsume = false;
+            self.input[self.pos - 1]
+        } else {
+            self.input[self.pos]
+        };
         self.pos += 1;
         c
+    }
+
+    fn create_start_tag(&mut self) {
+        self.latest_token = Some(
+            HtmlToken::StartTag { tag: String::new(), self_closing: false, attributes: Vec::new() }
+        )
+    }
+
+    fn create_end_tag(&mut self) {
+        self.latest_token = Some(
+            HtmlToken::EndTag { tag: String::new() }
+        )
     }
 }
 
@@ -102,7 +129,26 @@ impl Iterator for HtmlTokenizer {
 
                     return Some(HtmlToken::Char(c));
                 },
-                TokenizerState::TagOpen => todo!(),
+                TokenizerState::TagOpen => {
+                    if c == '/' {
+                        self.state = TokenizerState::EndTagOpen;
+                        continue;
+                    }
+
+                    if c.is_ascii_alphabetic() {
+                        self.reconsume = true;
+                        self.state = TokenizerState::TagName;
+                        self.create_start_tag();
+                        continue;
+                    }
+
+                    if self.is_eof() {
+                        return Some(HtmlToken::Eof);
+                    }
+
+                    self.reconsume = true;
+                    self.state = TokenizerState::Data
+                },
                 TokenizerState::EndTagOpen => todo!(),
                 TokenizerState::TagName => todo!(),
                 TokenizerState::BeforeAttributeName => todo!(),
