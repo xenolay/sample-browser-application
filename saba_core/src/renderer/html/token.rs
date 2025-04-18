@@ -346,7 +346,23 @@ impl Iterator for HtmlTokenizer {
 
                     self.append_character_to_attribute(c, AttributeField::Value);
                 },
-                TokenizerState::AttributeValueUnQuoted => todo!(),
+                TokenizerState::AttributeValueUnQuoted => {
+                    if c == ' ' {
+                        self.state = TokenizerState::BeforeAttributeName;
+                        continue;
+                    }
+
+                    if c == '>' {
+                        self.state = TokenizerState::Data;
+                        return self.emit_latest_token();
+                    }
+
+                    if self.is_eof() {
+                        return Some(HtmlToken::Eof);
+                    }
+
+                    self.append_character_to_attribute(c, AttributeField::Value);
+                },
                 TokenizerState::AfterAttributeValueQuoted => todo!(),
                 TokenizerState::SelfClosingStartTag => todo!(),
                 TokenizerState::ScriptData => todo!(),
