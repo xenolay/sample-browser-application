@@ -90,9 +90,9 @@ impl HtmlTokenizer {
             self.reconsume = false;
             self.input[self.pos - 1]
         } else {
-            self.input[self.pos]
+            self.pos += 1;
+            self.input[self.pos - 1]
         };
-        self.pos += 1;
         c
     }
 
