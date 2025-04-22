@@ -104,7 +104,7 @@ pub struct Element {
 }
 
 impl Element {
-    pub fn new(&self, kind: &str, attributes: Vec<AttributeField>) -> Self {
+    pub fn new(kind: &str, attributes: Vec<AttributeField>) -> Self {
         Element { kind: ElementKind::from_str(kind).expect("failed to convert string to ElementKind"), attributes: attributes }
     }
 
