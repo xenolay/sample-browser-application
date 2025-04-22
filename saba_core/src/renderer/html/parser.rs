@@ -1,6 +1,8 @@
+use core::str::FromStr;
+
 use alloc::vec::Vec;
 
-use crate::renderer::dom::node::{Node, Window};
+use crate::renderer::dom::node::{ElementKind, Node, Window};
 
 use super::{html_tag_attribute::{AttributeField, HtmlTagAttribute}, token::{HtmlToken, HtmlTokenizer}};
 
@@ -13,7 +15,7 @@ pub struct HtmlParser {
     tokenizer: HtmlTokenizer,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum InsertionMode {
     // https://html.spec.whatwg.org/multipage/parsing.html#parsing-main-inhtml のうち9種類のみ実装する
     Initial,
@@ -97,20 +99,126 @@ impl HtmlParser {
                     }
                     self.insert_element("head", Vec::new());
                     self.current_mode = InsertionMode::InHead;
+                    continue;
+                },
+                InsertionMode::InHead => {
+                    match token {
+                        Some(HtmlToken::Char(c)) => {
+                            if c == ' ' || c == '\n' {
+                                // 本だとここ誤植してそう
+                                token = self.tokenizer.next();
+                                continue;
+                            }
+                        },
+                        Some(HtmlToken::StartTag { ref tag, self_closing, ref attributes }) => {
+                            if tag == "style" || tag == "script" {
+                                self.insert_element(tag, attributes.to_vec());
+                                self.original_mode = self.current_mode;
+                                self.current_mode = InsertionMode::Text;
+                                token = self.tokenizer.next();
+                                continue;
+                            }
+
+                            // ここがないと head が省略されている html document で無限ループが出るらしい
+                            if tag == "body" {
+                                self.pop_until(ElementKind::Head);
+                                self.current_mode = InsertionMode::AfterHead;
+                                continue;
+                            }
+                            if let Ok(_element_kind) = ElementKind::from_str(tag) {
+                                self.pop_until(ElementKind::Head);
+                                self.current_mode = InsertionMode::AfterHead;
+                                continue;
+                            }
+                        },
+                        Some(HtmlToken::EndTag { tag }) => {
+                            if tag == "head" {
+                                self.current_mode = InsertionMode::AfterHead;
+                                token = self.tokenizer.next();
+                                self.pop_until(ElementKind::Head);
+                                continue;
+                            }
+
+                        },
+                        Some(HtmlToken::Eof) | None => {
+                            return self.window.clone();
+                        }
+                    }
+                    token = self.tokenizer.next();
                     continue;                    
                 },
-                InsertionMode::InHead => todo!(),
-                InsertionMode::AfterHead => todo!(),
+                InsertionMode::AfterHead => {
+                    match token {
+                        Some(HtmlToken::Char(c)) => {
+                            if c == ' ' || c == '\n' {
+                                token = self.tokenizer.next();
+                                continue;
+                            }
+                        },
+                        Some(HtmlToken::StartTag { ref tag, self_closing, ref attributes }) => {
+                            if tag == "body" {
+                                self.insert_element(tag, attributes.to_vec());
+                                self.current_mode = InsertionMode::InHead;
+                                token = self.tokenizer.next();
+                                continue;
+                            }
+                        },
+                        Some(HtmlToken::Eof) | None => {
+                            return self.window.clone();
+                        },
+                        _ => {}
+                    }
+                    self.insert_element("body", Vec::new());
+                    self.current_mode = InsertionMode::InHead;
+                    continue;
+                },
                 InsertionMode::InBody => todo!(),
                 InsertionMode::Text => todo!(),
-                InsertionMode::AfterBody => todo!(),
-                InsertionMode::AfterAfterBody => todo!(),
+                InsertionMode::AfterBody => {
+                    match token {
+                        Some(HtmlToken::Char(_)) => {
+                            token = self.tokenizer.next();
+                            continue;
+                        },
+                        Some(HtmlToken::EndTag { ref tag}) => {
+                            if tag == "html" {
+                                self.current_mode = InsertionMode::AfterAfterBody;
+                                token = self.tokenizer.next();
+                                continue;
+                            }
+                        },
+                        Some(HtmlToken::Eof) | None => {
+                            return self.window.clone();
+                        },
+                        _ => {}
+                    }
+                    self.current_mode = InsertionMode::InBody;
+                    continue;
+                },
+                InsertionMode::AfterAfterBody => {
+                    match token {
+                        Some(HtmlToken::Char(_)) => {
+                            token = self.tokenizer.next();
+                            continue;
+                        },
+                        Some(HtmlToken::Eof) | None => {
+                            return self.window.clone();
+                        },
+                        _ => {}
+                    }
+                    self.current_mode = InsertionMode::InBody;
+                    continue;
+                },
             }    
         }
         self.window.clone()
     }
 
     fn insert_element(&self, tag: &str, attributes: Vec<HtmlTagAttribute>) {
+        todo!();
+    }
+
+    fn pop_until(&self, kind: ElementKind) {
         todo!();
     }
 }
