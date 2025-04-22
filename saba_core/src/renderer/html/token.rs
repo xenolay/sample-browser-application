@@ -27,7 +27,7 @@ pub enum HtmlToken {
 // [] 13.2.5 Tokenization | HTML Standard
 // https://html.spec.whatwg.org/multipage/parsing.html#tokenization
 // ↑ で規定のある State の一部を実装する。本当は80種類あるのだが、全部実装すると日が暮れる……
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum TokenizerState {
     Data, // https://html.spec.whatwg.org/multipage/parsing.html#data-state
     TagOpen, // https://html.spec.whatwg.org/multipage/parsing.html#tag-open-state
@@ -49,7 +49,7 @@ pub enum TokenizerState {
     TemporaryBuffer, // whatwg 上で規定はないが、実装を簡単にするために実装する
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct HtmlTokenizer {
     state: TokenizerState,
     pos: usize,

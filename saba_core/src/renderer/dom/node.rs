@@ -12,6 +12,10 @@ pub struct Node {
 }
 
 impl Node {
+    pub fn new(kind: NodeKind) -> Self {
+        Self { kind }
+    }
+
     pub fn node_kind(&self) -> NodeKind {
         self.kind.clone()
     }
@@ -134,5 +138,16 @@ impl FromStr for ElementKind {
             "body" => Ok(Self::Body),
             _ => Err(format!("unimplemented element name: {:?}", s)),
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Window {
+    document: Node
+}
+
+impl Window {
+    pub fn new(&self) -> Self {
+        Self { document: Node::new(NodeKind::Document) }
     }
 }
