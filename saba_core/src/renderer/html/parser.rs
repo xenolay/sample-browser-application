@@ -2,7 +2,7 @@ use core::str::FromStr;
 
 use alloc::vec::Vec;
 
-use crate::renderer::dom::node::{ElementKind, Node, Window};
+use crate::renderer::dom::node::{Element, ElementKind, Node, Window};
 
 use super::{html_tag_attribute::{AttributeField, HtmlTagAttribute}, token::{HtmlToken, HtmlTokenizer}};
 
@@ -131,7 +131,7 @@ impl HtmlParser {
                                 continue;
                             }
                         },
-                        Some(HtmlToken::EndTag { tag }) => {
+                        Some(HtmlToken::EndTag { ref tag }) => {
                             if tag == "head" {
                                 self.current_mode = InsertionMode::AfterHead;
                                 token = self.tokenizer.next();
@@ -172,8 +172,73 @@ impl HtmlParser {
                     self.current_mode = InsertionMode::InHead;
                     continue;
                 },
-                InsertionMode::InBody => todo!(),
-                InsertionMode::Text => todo!(),
+                InsertionMode::InBody => {
+                    match token {
+                        Some(HtmlToken::EndTag { ref tag }) => {
+                            match tag.as_str() {
+                                "body" => {
+                                    self.current_mode = InsertionMode::AfterBody;
+                                    token = self.tokenizer.next();
+                                    if !self.contain_in_stack(ElementKind::Body) {
+                                        // [] 13.2.6.4.1 The "initial" insertion mode | HTML Standard
+                                        // https://html.spec.whatwg.org/multipage/parsing.html#the-initial-insertion-mode
+                                        // ----- Cited From Reference -----
+                                        // If the stack of open elements does not have a body element in scope, this is a parse error; ignore the token.
+                                        // --------------------------------
+                                        continue;
+                                    }
+                                    self.pop_until(ElementKind::Body);
+                                    continue;
+                                }
+                                "html" => {
+                                    if self.pop_current_node(ElementKind::Body) {
+                                        self.current_mode = InsertionMode::AfterBody;
+                                        assert!(self.pop_current_node(ElementKind::Html))
+                                    } else {
+                                        token = self.tokenizer.next();
+                                    }
+                                    continue;
+                                }
+                                _ => {
+                                    token = self.tokenizer.next();
+                                }
+                            }
+                        }
+                        Some(HtmlToken::Eof) | None => {
+                            return self.window.clone();
+                        }
+                        _ => {}
+                    }
+                },
+                InsertionMode::Text => {
+                    match token {
+                        Some(HtmlToken::Eof) | None => {
+                            return self.window.clone();
+                        }
+                        Some(HtmlToken::EndTag { ref tag }) => {
+                            if tag == "style" {
+                                self.pop_until(ElementKind::Style);
+                                self.current_mode = self.original_mode;
+                                token = self.tokenizer.next();
+                                continue;
+                            }
+                            if tag == "script" {
+                                self.pop_until(ElementKind::Script);
+                                self.current_mode = self.original_mode;
+                                token = self.tokenizer.next();
+                                continue;
+                            }
+                        }
+                        Some(HtmlToken::Char(c)) => {
+                            self.insert_char(c);
+                            token = self.tokenizer.next();
+                            continue;
+                        }
+                        _ => {}
+                    }
+
+                    self.current_mode = self.original_mode;
+                },
                 InsertionMode::AfterBody => {
                     match token {
                         Some(HtmlToken::Char(_)) => {
@@ -219,6 +284,18 @@ impl HtmlParser {
     }
 
     fn pop_until(&self, kind: ElementKind) {
+        todo!();
+    }
+
+    fn contain_in_stack(&self, kind: ElementKind) -> bool {
+        todo!();
+    }
+
+    fn pop_current_node(&self, kind: ElementKind) -> bool {
+        todo!();
+    }
+
+    fn insert_char(&self, c: char) {
         todo!();
     }
 }
