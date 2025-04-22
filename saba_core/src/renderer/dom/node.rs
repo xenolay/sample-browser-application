@@ -1,10 +1,34 @@
-use alloc::string::String;
+use core::str::FromStr;
+
+use alloc::{format, string::String, vec::Vec};
+
+use crate::renderer::html::html_tag_attribute::AttributeField;
 
 
 
 #[derive(Debug, Clone)]
 pub struct Node {
     pub kind: NodeKind
+}
+
+impl Node {
+    pub fn node_kind(&self) -> NodeKind {
+        self.kind.clone()
+    }
+
+    pub fn get_element(&self) -> Option<Element> {
+        match &self.kind {
+            NodeKind::Element(element) => Some(element.clone()),
+            _ => None,
+        }
+    }
+
+    pub fn get_element_kind(&self) -> Option<ElementKind> {
+        match &self.kind {
+            NodeKind::Element(e) => Some(e.kind),
+            _ => None
+        }
+    }
 }
 
 // [] 4.2. Node tree | DOM Standard
@@ -75,4 +99,40 @@ pub enum NodeKind {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Element {
+    kind: ElementKind,
+    attributes: Vec<AttributeField>,
+}
+
+impl Element {
+    pub fn new(&self, kind: &str, attributes: Vec<AttributeField>) -> Self {
+        Element { kind: ElementKind::from_str(kind).expect("failed to convert string to ElementKind"), attributes: attributes }
+    }
+
+    pub fn kind(&self) -> ElementKind {
+        self.kind
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum ElementKind {
+    Html,
+    Head,
+    Style,
+    Script,
+    Body,
+}
+
+impl FromStr for ElementKind {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "html" => Ok(Self::Html),
+            "head" => Ok(Self::Head),
+            "style" => Ok(Self::Style),
+            "script" => Ok(Self::Style),
+            "body" => Ok(Self::Body),
+            _ => Err(format!("unimplemented element name: {:?}", s)),
+        }
+    }
 }

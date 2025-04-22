@@ -10,6 +10,7 @@ pub struct HtmlTagAttribute {
     value: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AttributeField {
     Name,
     Value
