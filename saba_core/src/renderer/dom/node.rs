@@ -147,7 +147,7 @@ pub struct Window {
 }
 
 impl Window {
-    pub fn new(&self) -> Self {
+    pub fn new() -> Self {
         Self { document: Node::new(NodeKind::Document) }
     }
 }
