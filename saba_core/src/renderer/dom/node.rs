@@ -1,4 +1,4 @@
-use core::str::FromStr;
+use core::{cell::RefCell, str::FromStr};
 
 use alloc::{format, rc::{Rc, Weak}, string::String, vec::Vec};
 
@@ -11,13 +11,14 @@ pub struct Node {
     // 親など、自分が所有権を主張したらマズそうなものは全て Weak で宣言する
     // first_child や next_sibling は自身の drop とともに消えてほしいので Rc で宣言する
     // Node -> first_child -> last_child という推移的な所有関係は成り立ち得る
+    // html parse のタイミングでこれらの reference の中身をいじりたいので RefCell でくるんで interior mutability を確保する
     pub kind: NodeKind,
-    window: Weak<Window>,
-    parent: Weak<Node>,
-    first_child: Option<Rc<Node>>,
-    last_child: Weak<Node>,
-    previous_sibling: Weak<Node>,
-    next_sibling: Option<Rc<Node>>
+    window: Weak<RefCell<Window>>,
+    parent: Weak<RefCell<Node>>,
+    first_child: Option<Rc<RefCell<Node>>>,
+    last_child: Weak<RefCell<Node>>,
+    previous_sibling: Weak<RefCell<Node>>,
+    next_sibling: Option<Rc<RefCell<Node>>>
 }
 
 impl Node {
@@ -29,43 +30,43 @@ impl Node {
         self.kind.clone()
     }
 
-    pub fn set_parent(&mut self, parent: Weak<Node>) {
+    pub fn set_parent(&mut self, parent: Weak<RefCell<Node>>) {
         self.parent = parent;
     }
 
-    pub fn parent(&self) -> Weak<Node> {
+    pub fn parent(&self) -> Weak<RefCell<Node>> {
         Weak::clone(&self.parent)
     }
 
-    pub fn set_first_child(&mut self, first_child: Option<Rc<Node>>) {
+    pub fn set_first_child(&mut self, first_child: Option<Rc<RefCell<Node>>>) {
         self.first_child = first_child
     }
 
-    pub fn first_child(&self) -> Option<Rc<Node>> {
+    pub fn first_child(&self) -> Option<Rc<RefCell<Node>>> {
         self.first_child.as_ref().cloned() // こうしないと move しちゃうのだ
     }
 
-    pub fn set_last_child(&mut self, last_child: Weak<Node>) {
+    pub fn set_last_child(&mut self, last_child: Weak<RefCell<Node>>) {
         self.last_child = last_child
     }
 
-    pub fn last_child(&self) -> Weak<Node> {
+    pub fn last_child(&self) -> Weak<RefCell<Node>> {
         Weak::clone(&self.last_child)
     }
 
-    pub fn set_previous_sibling(&mut self, previous_sibling: Weak<Node>) {
+    pub fn set_previous_sibling(&mut self, previous_sibling: Weak<RefCell<Node>>) {
         self.previous_sibling = previous_sibling
     }
 
-    pub fn previous_sibling(&self) -> Weak<Node> {
+    pub fn previous_sibling(&self) -> Weak<RefCell<Node>> {
         Weak::clone(&self.previous_sibling)
     }
 
-    pub fn set_next_sibling(&mut self, next_sibling: Option<Rc<Node>>) {
+    pub fn set_next_sibling(&mut self, next_sibling: Option<Rc<RefCell<Node>>>) {
         self.next_sibling = next_sibling
     }
 
-    pub fn next_sibling(&self) -> Option<Rc<Node>> {
+    pub fn next_sibling(&self) -> Option<Rc<RefCell<Node>>> {
         self.next_sibling.as_ref().cloned()
     }
 
@@ -192,15 +193,15 @@ impl FromStr for ElementKind {
 
 #[derive(Debug, Clone)]
 pub struct Window {
-    document: Rc<Node>
+    document: Rc<RefCell<Node>>
 }
 
 impl Window {
     pub fn new() -> Self {
-        Self { document: Rc::new(Node::new(NodeKind::Document)) }
+        Self { document: Rc::new(RefCell::new(Node::new(NodeKind::Document))) }
     }
 
-    pub fn document(&self) -> Rc<Node> {
+    pub fn document(&self) -> Rc<RefCell<Node>> {
         Rc::clone(&self.document)
     }
 }

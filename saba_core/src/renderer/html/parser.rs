@@ -1,4 +1,4 @@
-use core::str::FromStr;
+use core::{cell::RefCell, str::FromStr};
 
 use alloc::{rc::Rc, vec::Vec};
 
@@ -11,7 +11,7 @@ pub struct HtmlParser {
     window: Window, // 本だと Rc している
     current_mode: InsertionMode,
     original_mode: InsertionMode, // https://html.spec.whatwg.org/multipage/parsing.html#original-insertion-mode
-    stack_of_open_elements: Vec<Rc<Node>>, // https://html.spec.whatwg.org/multipage/parsing.html#the-stack-of-open-elements
+    stack_of_open_elements: Vec<Rc<RefCell<Node>>>, // https://html.spec.whatwg.org/multipage/parsing.html#the-stack-of-open-elements
     tokenizer: HtmlTokenizer,
 }
 
@@ -285,21 +285,21 @@ impl HtmlParser {
 
     fn insert_element(&self, tag: &str, attributes: Vec<HtmlTagAttribute>) {
         let window = &self.window;
-        let current = match self.stack_of_open_elements.last() {
+        let mut current = match self.stack_of_open_elements.last() {
             Some(n) => n.clone(),
             None => window.document(),
         };
 
-        let node = Rc::new(self.create_element(tag, attributes));
+        let node = Rc::new(RefCell::new(self.create_element(tag, attributes)));
 
-        if current.first_child().is_some() {
+        if current.borrow().first_child().is_some() {
             // なんかもうちょいどうにかならんかな。last_sibling が some であることはこのブロックにおける不変条件なので、それが明確になるようにしたい
-            let mut last_sibling = current.first_child();
+            let mut last_sibling = current.borrow().first_child();
             loop {
                 last_sibling = match last_sibling {
                     Some(ref node) => {
-                        if node.next_sibling().is_some() {
-                            node.next_sibling()
+                        if node.borrow().next_sibling().is_some() {
+                            node.borrow().next_sibling()
                         } else {
                             break;
                         }
@@ -311,7 +311,11 @@ impl HtmlParser {
             // ここで mutate したいので Node の Fields は RefCell で包まないといけない。なるほど～
             // Rc::get_mut するのは、一般には Rc での参照が1つとは限らないので上手くいかない。
             // let a = Rc::get_mut(&mut last_sibling.unwrap()).unwrap().set_next_sibling(Some(Rc::clone(&node)));
-            // last_sibling.unwrap().set_next_sibling(Some(Rc::clone(&node)));
+            last_sibling.as_ref().unwrap().borrow_mut().set_next_sibling(Some(Rc::clone(&node)));
+
+            node.borrow_mut().set_previous_sibling(Rc::downgrade(&last_sibling.unwrap()));
+        } else {
+            current.borrow_mut().set_first_child(Some(node));
         }
     }
 
