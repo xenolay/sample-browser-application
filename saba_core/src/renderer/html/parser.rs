@@ -283,7 +283,7 @@ impl HtmlParser {
         Node::new(NodeKind::Element(Element::new(tag, attributes)))
     }
 
-    fn insert_element(&self, tag: &str, attributes: Vec<HtmlTagAttribute>) {
+    fn insert_element(&mut self, tag: &str, attributes: Vec<HtmlTagAttribute>) {
         let window = &self.window;
         let mut current = match self.stack_of_open_elements.last() {
             Some(n) => n.clone(),
@@ -315,8 +315,13 @@ impl HtmlParser {
 
             node.borrow_mut().set_previous_sibling(Rc::downgrade(&last_sibling.unwrap()));
         } else {
-            current.borrow_mut().set_first_child(Some(node));
+            current.borrow_mut().set_first_child(Some(Rc::clone(&node)));
         }
+
+        current.borrow_mut().set_last_child(Rc::downgrade(&node));
+        node.borrow_mut().set_parent(Rc::downgrade(&current));
+
+        self.stack_of_open_elements.push(node);
     }
 
     fn pop_until(&self, kind: ElementKind) {
