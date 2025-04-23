@@ -1,23 +1,72 @@
 use core::str::FromStr;
 
-use alloc::{format, string::String, vec::Vec};
+use alloc::{format, rc::{Rc, Weak}, string::String, vec::Vec};
 
-use crate::renderer::html::html_tag_attribute::AttributeField;
+use crate::renderer::html::html_tag_attribute::HtmlTagAttribute;
 
 
 
 #[derive(Debug, Clone)]
 pub struct Node {
-    pub kind: NodeKind
+    // 親など、自分が所有権を主張したらマズそうなものは全て Weak で宣言する
+    // first_child や next_sibling は自身の drop とともに消えてほしいので Rc で宣言する
+    // Node -> first_child -> last_child という推移的な所有関係は成り立ち得る
+    pub kind: NodeKind,
+    window: Weak<Window>,
+    parent: Weak<Node>,
+    first_child: Option<Rc<Node>>,
+    last_child: Weak<Node>,
+    previous_sibling: Weak<Node>,
+    next_sibling: Option<Rc<Node>>
 }
 
 impl Node {
     pub fn new(kind: NodeKind) -> Self {
-        Self { kind }
+        Self { kind, window: Weak::new(), parent: Weak::new(), first_child: None, last_child: Weak::new(), previous_sibling: Weak::new(), next_sibling: None }
     }
 
     pub fn node_kind(&self) -> NodeKind {
         self.kind.clone()
+    }
+
+    pub fn set_parent(&mut self, parent: Weak<Node>) {
+        self.parent = parent;
+    }
+
+    pub fn parent(&self) -> Weak<Node> {
+        Weak::clone(&self.parent)
+    }
+
+    pub fn set_first_child(&mut self, first_child: Option<Rc<Node>>) {
+        self.first_child = first_child
+    }
+
+    pub fn first_child(&self) -> Option<Rc<Node>> {
+        self.first_child.as_ref().cloned() // こうしないと move しちゃうのだ
+    }
+
+    pub fn set_last_child(&mut self, last_child: Weak<Node>) {
+        self.last_child = last_child
+    }
+
+    pub fn last_child(&self) -> Weak<Node> {
+        Weak::clone(&self.last_child)
+    }
+
+    pub fn set_previous_sibling(&mut self, previous_sibling: Weak<Node>) {
+        self.previous_sibling = previous_sibling
+    }
+
+    pub fn previous_sibling(&self) -> Weak<Node> {
+        Weak::clone(&self.previous_sibling)
+    }
+
+    pub fn set_next_sibling(&mut self, next_sibling: Option<Rc<Node>>) {
+        self.next_sibling = next_sibling
+    }
+
+    pub fn next_sibling(&self) -> Option<Rc<Node>> {
+        self.next_sibling.as_ref().cloned()
     }
 
     pub fn get_element(&self) -> Option<Element> {
@@ -104,11 +153,11 @@ pub enum NodeKind {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Element {
     kind: ElementKind,
-    attributes: Vec<AttributeField>,
+    attributes: Vec<HtmlTagAttribute>,
 }
 
 impl Element {
-    pub fn new(kind: &str, attributes: Vec<AttributeField>) -> Self {
+    pub fn new(kind: &str, attributes: Vec<HtmlTagAttribute>) -> Self {
         Element { kind: ElementKind::from_str(kind).expect("failed to convert string to ElementKind"), attributes: attributes }
     }
 
@@ -143,11 +192,15 @@ impl FromStr for ElementKind {
 
 #[derive(Debug, Clone)]
 pub struct Window {
-    document: Node
+    document: Rc<Node>
 }
 
 impl Window {
     pub fn new() -> Self {
-        Self { document: Node::new(NodeKind::Document) }
+        Self { document: Rc::new(Node::new(NodeKind::Document)) }
+    }
+
+    pub fn document(&self) -> Rc<Node> {
+        Rc::clone(&self.document)
     }
 }

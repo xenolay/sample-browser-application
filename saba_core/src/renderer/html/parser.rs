@@ -1,17 +1,17 @@
 use core::str::FromStr;
 
-use alloc::vec::Vec;
+use alloc::{rc::Rc, vec::Vec};
 
-use crate::renderer::dom::node::{Element, ElementKind, Node, Window};
+use crate::renderer::dom::node::{Element, ElementKind, Node, NodeKind, Window};
 
-use super::{html_tag_attribute::{AttributeField, HtmlTagAttribute}, token::{HtmlToken, HtmlTokenizer}};
+use super::{html_tag_attribute::HtmlTagAttribute, token::{HtmlToken, HtmlTokenizer}};
 
 #[derive(Debug, Clone)]
 pub struct HtmlParser {
-    window: Window,
+    window: Window, // 本だと Rc している
     current_mode: InsertionMode,
     original_mode: InsertionMode, // https://html.spec.whatwg.org/multipage/parsing.html#original-insertion-mode
-    stack_of_open_elements: Vec<Node>, // https://html.spec.whatwg.org/multipage/parsing.html#the-stack-of-open-elements
+    stack_of_open_elements: Vec<Rc<Node>>, // https://html.spec.whatwg.org/multipage/parsing.html#the-stack-of-open-elements
     tokenizer: HtmlTokenizer,
 }
 
@@ -279,8 +279,40 @@ impl HtmlParser {
         self.window.clone()
     }
 
+    fn create_element(&self, tag: &str, attributes: Vec<HtmlTagAttribute>) -> Node {
+        Node::new(NodeKind::Element(Element::new(tag, attributes)))
+    }
+
     fn insert_element(&self, tag: &str, attributes: Vec<HtmlTagAttribute>) {
-        todo!();
+        let window = &self.window;
+        let current = match self.stack_of_open_elements.last() {
+            Some(n) => n.clone(),
+            None => window.document(),
+        };
+
+        let node = Rc::new(self.create_element(tag, attributes));
+
+        if current.first_child().is_some() {
+            // なんかもうちょいどうにかならんかな。last_sibling が some であることはこのブロックにおける不変条件なので、それが明確になるようにしたい
+            let mut last_sibling = current.first_child();
+            loop {
+                last_sibling = match last_sibling {
+                    Some(ref node) => {
+                        if node.next_sibling().is_some() {
+                            node.next_sibling()
+                        } else {
+                            break;
+                        }
+                    }
+                    None => unimplemented!("ha?")
+                }
+            }
+
+            // ここで mutate したいので Node の Fields は RefCell で包まないといけない。なるほど～
+            // Rc::get_mut するのは、一般には Rc での参照が1つとは限らないので上手くいかない。
+            // let a = Rc::get_mut(&mut last_sibling.unwrap()).unwrap().set_next_sibling(Some(Rc::clone(&node)));
+            // last_sibling.unwrap().set_next_sibling(Some(Rc::clone(&node)));
+        }
     }
 
     fn pop_until(&self, kind: ElementKind) {
