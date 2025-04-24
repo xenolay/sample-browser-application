@@ -155,10 +155,10 @@ impl HtmlParser {
                                 continue;
                             }
                         },
-                        Some(HtmlToken::StartTag { ref tag, self_closing, ref attributes }) => {
+                        Some(HtmlToken::StartTag { ref tag, self_closing: _, ref attributes }) => {
                             if tag == "body" {
                                 self.insert_element(tag, attributes.to_vec());
-                                self.current_mode = InsertionMode::InHead;
+                                self.current_mode = InsertionMode::InBody;
                                 token = self.tokenizer.next();
                                 continue;
                             }
@@ -169,11 +169,23 @@ impl HtmlParser {
                         _ => {}
                     }
                     self.insert_element("body", Vec::new());
-                    self.current_mode = InsertionMode::InHead;
+                    self.current_mode = InsertionMode::InBody;
                     continue;
                 },
                 InsertionMode::InBody => {
                     match token {
+                        Some(HtmlToken::StartTag { ref tag, self_closing: _, ref attributes }) => {
+                            match tag.as_str() {
+                                "p" | "a" => {
+                                    self.insert_element(tag, attributes.to_vec());
+                                    token = self.tokenizer.next();
+                                    continue;
+                                }
+                                _ => {
+                                    token = self.tokenizer.next();
+                                }
+                            }
+                        }
                         Some(HtmlToken::EndTag { ref tag }) => {
                             match tag.as_str() {
                                 "body" => {
@@ -199,6 +211,12 @@ impl HtmlParser {
                                     }
                                     continue;
                                 }
+                                "p" | "a" => {
+                                    let element_kind = ElementKind::from_str(tag).expect("ha?");
+                                    token = self.tokenizer.next();
+                                    self.pop_until(element_kind);
+                                    continue;
+                                }
                                 _ => {
                                     token = self.tokenizer.next();
                                 }
@@ -207,7 +225,11 @@ impl HtmlParser {
                         Some(HtmlToken::Eof) | None => {
                             return self.window.clone();
                         }
-                        _ => {}
+                        Some(HtmlToken::Char(c)) => {
+                            self.insert_char(c);
+                            token = self.tokenizer.next();
+                            continue;
+                        }
                     }
                 },
                 InsertionMode::Text => {
