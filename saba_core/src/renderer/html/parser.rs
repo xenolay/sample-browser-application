@@ -1,6 +1,6 @@
 use core::{cell::RefCell, str::FromStr};
 
-use alloc::{rc::Rc, vec::Vec};
+use alloc::{rc::Rc, string::ToString, vec::Vec};
 
 use crate::renderer::dom::node::{Element, ElementKind, Node, NodeKind, Window};
 
@@ -324,19 +324,94 @@ impl HtmlParser {
         self.stack_of_open_elements.push(node);
     }
 
-    fn pop_until(&self, kind: ElementKind) {
-        todo!();
+    fn pop_until(&mut self, kind: ElementKind) {
+        loop {
+            let current = match self.stack_of_open_elements.pop() {
+                Some(n) => n,
+                None => return
+            };
+
+            if current.borrow().get_element_kind() == Some(kind) {
+                return;
+            }
+        }
     }
 
     fn contain_in_stack(&self, kind: ElementKind) -> bool {
-        todo!();
+        // find で書けるから書いたけど別にわかりやすくなった気はしないな
+        if let Some(_) = self.stack_of_open_elements.iter().find(|x| x.borrow().get_element_kind() == Some(kind)) {
+            true
+        } else {
+            false
+        }
     }
 
-    fn pop_current_node(&self, kind: ElementKind) -> bool {
-        todo!();
+    fn pop_current_node(&mut self, kind: ElementKind) -> bool {
+        let current = match self.stack_of_open_elements.last() {
+            Some(n) => n,
+            None => return false,
+        };
+
+        if current.borrow().get_element_kind() == Some(kind) {
+            self.stack_of_open_elements.pop();
+            return true;
+        }
+
+        false
     }
 
-    fn insert_char(&self, c: char) {
-        todo!();
+    fn create_char(&self, c: char) -> Node {
+        Node::new(NodeKind::Text(c.to_string()))
+    }
+
+    fn insert_char(&mut self, c: char) {
+        let current = match self.stack_of_open_elements.last() {
+            Some(n) => Rc::clone(n),
+            None => return, // 本当はこの枝に入る時点で何かがおかしいのでいい感じに弾きたいんだよな。しかしサボってエラーを握りつぶすことにする
+        };
+
+        // 現在参照しているノードが Text ならそいつに push すればいいのでそうする
+        if let NodeKind::Text(mut s) = current.borrow_mut().node_kind() {
+            s.push(c);
+            return;
+        };
+
+        if c == '\n' || c == ' ' {
+            return;
+        }
+
+        let node = Rc::new(RefCell::new(self.create_char(c)));
+
+        if current.borrow().first_child().is_some() {
+            // 本だとこのパートだけ last_sibling のサーチをサボってるんだけど、やったほうがいいのでは？？？？
+            // なんかもうちょいどうにかならんかな（2）。last_sibling が some であることはこのブロックにおける不変条件なので、それが明確になるようにしたい
+            let mut last_sibling = current.borrow().first_child();
+            loop {
+                last_sibling = match last_sibling {
+                    Some(ref node) => {
+                        if node.borrow().next_sibling().is_some() {
+                            node.borrow().next_sibling()
+                        } else {
+                            break;
+                        }
+                    }
+                    None => unimplemented!("ha?")
+                }
+            }
+
+            // ここで mutate したいので Node の Fields は RefCell で包まないといけない。なるほど～
+            // Rc::get_mut するのは、一般には Rc での参照が1つとは限らないので上手くいかない。
+            // let a = Rc::get_mut(&mut last_sibling.unwrap()).unwrap().set_next_sibling(Some(Rc::clone(&node)));
+            last_sibling.as_ref().unwrap().borrow_mut().set_next_sibling(Some(Rc::clone(&node)));
+
+            node.borrow_mut().set_previous_sibling(Rc::downgrade(&last_sibling.unwrap()));
+        } else {
+            current.borrow_mut().set_first_child(Some(Rc::clone(&node)));
+        }
+
+        current.borrow_mut().set_last_child(Rc::downgrade(&node));
+        node.borrow_mut().set_parent(Rc::downgrade(&current));
+
+        self.stack_of_open_elements.push(node);
     }
 }
