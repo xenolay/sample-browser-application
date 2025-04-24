@@ -85,6 +85,12 @@ impl Node {
     }
 }
 
+impl PartialEq for Node {
+    fn eq(&self, other: &Self) -> bool {
+        self.kind == other.kind
+    }
+}
+
 // [] 4.2. Node tree | DOM Standard
 // https://dom.spec.whatwg.org/#node-trees
 // ----- Cited From Reference -----
@@ -144,11 +150,24 @@ impl Node {
 
 // Comment: 必須ではないのでパス。
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq)]
 pub enum NodeKind {
     Document, // https://dom.spec.whatwg.org/#interface-document Document <- Node
     Element(Element), // https://dom.spec.whatwg.org/#interface-element Element <- Node
     Text(String), // https://dom.spec.whatwg.org/#interface-text Text <- CharacterData <- Node
+}
+
+impl PartialEq for NodeKind {
+    fn eq(&self, other: &Self) -> bool {
+        match &self {
+            NodeKind::Document => matches!(other, NodeKind::Document),
+            NodeKind::Element(e1) => match &other {
+                NodeKind::Element(e2) => e1.kind == e2.kind,
+                _ => false,
+            },
+            NodeKind::Text(_) => matches!(other, NodeKind::Text(_)),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

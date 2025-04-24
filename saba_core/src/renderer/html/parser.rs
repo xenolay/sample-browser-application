@@ -8,7 +8,7 @@ use super::{html_tag_attribute::HtmlTagAttribute, token::{HtmlToken, HtmlTokeniz
 
 #[derive(Debug, Clone)]
 pub struct HtmlParser {
-    window: Window, // 本だと Rc している
+    window: Rc<RefCell<Window>>, // 本だと Rc している。少なくとも単体テスト時には Rc されてないと困る。
     current_mode: InsertionMode,
     original_mode: InsertionMode, // https://html.spec.whatwg.org/multipage/parsing.html#original-insertion-mode
     stack_of_open_elements: Vec<Rc<RefCell<Node>>>, // https://html.spec.whatwg.org/multipage/parsing.html#the-stack-of-open-elements
@@ -31,11 +31,11 @@ pub enum InsertionMode {
 
 impl HtmlParser {
     pub fn new(tokenizer: HtmlTokenizer) -> Self {
-        Self { window: Window::new(), current_mode: InsertionMode::Initial, original_mode: InsertionMode::Initial, stack_of_open_elements: Vec::new(), tokenizer }
+        Self { window: Rc::new(RefCell::new(Window::new())), current_mode: InsertionMode::Initial, original_mode: InsertionMode::Initial, stack_of_open_elements: Vec::new(), tokenizer }
     }
 
     // 本当は token の reprocess が必要なことがあるのだが、色々と実装を妥協している
-    pub fn construct_tree(&mut self) -> Window {
+    pub fn construct_tree(&mut self) -> Rc<RefCell<Window>> {
         let mut token = self.tokenizer.next();
         while token.is_some() {
             match self.current_mode {
@@ -287,7 +287,7 @@ impl HtmlParser {
         let window = &self.window;
         let mut current = match self.stack_of_open_elements.last() {
             Some(n) => n.clone(),
-            None => window.document(),
+            None => window.borrow().document(),
         };
 
         let node = Rc::new(RefCell::new(self.create_element(tag, attributes)));
@@ -413,5 +413,184 @@ impl HtmlParser {
         node.borrow_mut().set_parent(Rc::downgrade(&current));
 
         self.stack_of_open_elements.push(node);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{alloc::string::ToString, renderer::html::html_tag_attribute::AttributeField};
+    use alloc::vec;
+
+    #[test]
+    fn test_empty() {
+        let html = "".to_string();
+        let t = HtmlTokenizer::new(html);
+        let window = HtmlParser::new(t).construct_tree();
+        let expected = Rc::new(RefCell::new(Node::new(NodeKind::Document)));
+
+        assert_eq!(expected, window.borrow().document());
+    }
+
+    #[test]
+    fn test_body() {
+        let html = "<html><head></head><body></body></html>".to_string();
+        let t = HtmlTokenizer::new(html);
+        let window = HtmlParser::new(t).construct_tree();
+        let document = window.borrow().document();
+        assert_eq!(
+            Rc::new(RefCell::new(Node::new(NodeKind::Document))),
+            document
+        );
+
+        let html = document
+            .borrow()
+            .first_child()
+            .expect("failed to get a first child of document");
+        assert_eq!(
+            Rc::new(RefCell::new(Node::new(NodeKind::Element(Element::new(
+                "html",
+                Vec::new()
+            ))))),
+            html
+        );
+
+        let head = html
+            .borrow()
+            .first_child()
+            .expect("failed to get a first child of html");
+        assert_eq!(
+            Rc::new(RefCell::new(Node::new(NodeKind::Element(Element::new(
+                "head",
+                Vec::new()
+            ))))),
+            head
+        );
+
+        let body = head
+            .borrow()
+            .next_sibling()
+            .expect("failed to get a next sibling of head");
+        assert_eq!(
+            Rc::new(RefCell::new(Node::new(NodeKind::Element(Element::new(
+                "body",
+                Vec::new()
+            ))))),
+            body
+        );
+    }
+
+    #[test]
+    fn test_text() {
+        let html = "<html><head></head><body>text</body></html>".to_string();
+        let t = HtmlTokenizer::new(html);
+        let window = HtmlParser::new(t).construct_tree();
+        let document = window.borrow().document();
+        assert_eq!(
+            Rc::new(RefCell::new(Node::new(NodeKind::Document))),
+            document
+        );
+
+        let html = document
+            .borrow()
+            .first_child()
+            .expect("failed to get a first child of document");
+        assert_eq!(
+            Rc::new(RefCell::new(Node::new(NodeKind::Element(Element::new(
+                "html",
+                Vec::new()
+            ))))),
+            html
+        );
+
+        let body = html
+            .borrow()
+            .first_child()
+            .expect("failed to get a first child of document")
+            .borrow()
+            .next_sibling()
+            .expect("failed to get a next sibling of head");
+        assert_eq!(
+            Rc::new(RefCell::new(Node::new(NodeKind::Element(Element::new(
+                "body",
+                Vec::new()
+            ))))),
+            body
+        );
+
+        let text = body
+            .borrow()
+            .first_child()
+            .expect("failed to get a first child of document");
+        assert_eq!(
+            Rc::new(RefCell::new(Node::new(NodeKind::Text("text".to_string())))),
+            text
+        );
+    }
+
+    #[test]
+    fn test_multiple_nodes() {
+        let html = "<html><head></head><body><p><a foo=bar>text</a></p></body></html>".to_string();
+        let t = HtmlTokenizer::new(html);
+        let window = HtmlParser::new(t).construct_tree();
+        let document = window.borrow().document();
+
+        let body = document
+            .borrow()
+            .first_child()
+            .expect("failed to get a first child of document")
+            .borrow()
+            .first_child()
+            .expect("failed to get a first child of document")
+            .borrow()
+            .next_sibling()
+            .expect("failed to get a next sibling of head");
+        assert_eq!(
+            Rc::new(RefCell::new(Node::new(NodeKind::Element(Element::new(
+                "body",
+                Vec::new()
+            ))))),
+            body
+        );
+
+        let p = body
+            .borrow()
+            .first_child()
+            .expect("failed to get a first child of body");
+        assert_eq!(
+            Rc::new(RefCell::new(Node::new(NodeKind::Element(Element::new(
+                "p",
+                Vec::new()
+            ))))),
+            p
+        );
+
+        let mut attr = HtmlTagAttribute::new();
+        attr.add_char('f', AttributeField::Name);
+        attr.add_char('o', AttributeField::Name);
+        attr.add_char('o', AttributeField::Name);
+        attr.add_char('b', AttributeField::Value);
+        attr.add_char('a', AttributeField::Value);
+        attr.add_char('r', AttributeField::Value);
+        let a = p
+            .borrow()
+            .first_child()
+            .expect("failed to get a first child of p");
+        assert_eq!(
+            Rc::new(RefCell::new(Node::new(NodeKind::Element(Element::new(
+                "a",
+                vec![attr]
+            ))))),
+            a
+        );
+
+        let text = a
+            .borrow()
+            .first_child()
+            .expect("failed to get a first child of a");
+        assert_eq!(
+            Rc::new(RefCell::new(Node::new(NodeKind::Text("text".to_string())))),
+            text
+        );
     }
 }
