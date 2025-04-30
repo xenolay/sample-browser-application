@@ -47,6 +47,41 @@ impl CssTokenizer {
 
         s
     }
+
+    fn consume_numeric_token(&mut self) -> f64 {
+        let mut num = 0f64;
+        let mut floating = false;
+        let mut floating_digit = 1f64;
+
+        loop {
+            if self.pos >= self.input.len() {
+                return num;
+            }
+
+            let c = self.input[self.pos];
+
+            // 数字と . でない文字が出てくるまで self.pos を進める。つまり関数を抜けたタイミングで self.pos は数字でも . でもない文字を指している。
+            // なので、この関数を抜けた直後で self.pos は -1 しないといけない
+            match c {
+                '0'..='9' => {
+                    if floating {
+                        floating_digit *= 1f64/10f64;
+                        num += (c.to_digit(10).unwrap() as f64) * floating_digit
+                    } else {
+                        num = num * 10.0 + (c.to_digit(10).unwrap() as f64)
+                    }
+                    self.pos += 1;
+                },
+                '.' => {
+                    floating = true;
+                    self.pos += 1;
+                },
+                _ => break,
+            }
+        }
+
+        num
+    }
 }
 
 impl Iterator for CssTokenizer {
@@ -77,6 +112,10 @@ impl Iterator for CssTokenizer {
                 '"' | '\'' => {
                     let value = self.consume_string_token();
                     CssToken::StringToken(value)
+                },
+                '0'..='9' => {
+                    let value = self.consume_numeric_token();
+                    CssToken::Number(value)
                 },
                 _ => {
                     unimplemented!("char {} is not supported yet", c)
