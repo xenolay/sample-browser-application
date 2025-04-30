@@ -28,77 +28,63 @@ impl CssTokenizer {
         Self { pos: 0, input: css.chars().collect() }
     }
 
-    fn create_string_token(&mut self) -> String {
+    // 文字列トークンを [start] の引用符でスキャンし、閉じ引用符の位置を返す
+    fn consume_string_at(input: &[char], start: usize) -> (String, usize) {
+        let ending = input[start];
         let mut s = String::new();
-
-        loop {
-            if self.pos >= self.input.len() {
-                return s;
-            }
-
-            self.pos += 1;
-
-            let c = self.input[self.pos];
-            match c {
-                '"' | '\'' => break,
-                _ => s.push(c),
-            }
+        let mut pos = start + 1;
+        while pos < input.len() {
+            let c = input[pos];
+            if c == ending { break; }
+            s.push(c);
+            pos += 1;
         }
-
-        s
+        (s, pos)
     }
 
-    fn create_numeric_token(&mut self) -> f64 {
+    // 数値トークンを [start] からスキャンし、終端位置を返す
+    fn consume_numeric_at(input: &[char], start: usize) -> (f64, usize) {
         let mut num = 0f64;
         let mut floating = false;
-        let mut floating_digit = 1f64;
+        let mut factor = 1f64;
+        let mut pos = start;
 
-        loop {
-            if self.pos >= self.input.len() {
-                return num;
-            }
-
-            let c = self.input[self.pos];
-
-            // 数字と . でない文字が出てくるまで self.pos を進める。つまり関数を抜けたタイミングで self.pos は数字でも . でもない文字を指している。
-            // なので、この関数を抜けた直後で self.pos は -1 しないといけない
-            match c {
+        while pos < input.len() {
+            match input[pos] {
                 '0'..='9' => {
+                    let digit = input[pos].to_digit(10).unwrap() as f64;
                     if floating {
-                        floating_digit *= 1f64/10f64;
-                        num += (c.to_digit(10).unwrap() as f64) * floating_digit
+                        factor *= 0.1;
+                        num += digit * factor;
                     } else {
-                        num = num * 10.0 + (c.to_digit(10).unwrap() as f64)
+                        num = num * 10.0 + digit;
                     }
-                    self.pos += 1;
-                },
-                '.' => {
+                    pos += 1;
+                }
+                '.' if !floating => {
                     floating = true;
-                    self.pos += 1;
-                },
-                _ => break,
-            }
-        }
-
-        num
-    }
-
-    fn create_ident_token(&mut self) -> String {
-        let mut s = String::new();
-        s.push(self.input[self.pos]);
-
-        loop {
-            self.pos += 1;
-            let c = self.input[self.pos];
-            match c {
-                'a'..='z' | 'A'..='Z' | '0'..='9' | '-' | '_' => {
-                    s.push(c)
+                    pos += 1;
                 }
                 _ => break,
             }
         }
+        (num, pos)
+    }
 
-        s
+    // 識別子トークンを [start] からスキャンし、終端位置を返す
+    fn consume_ident_at(input: &[char], start: usize) -> (String, usize) {
+        let mut s = String::new();
+        let mut pos = start;
+        while pos < input.len() {
+            let c = input[pos];
+            if c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '#' {
+                s.push(c);
+                pos += 1;
+            } else {
+                break;
+            }
+        }
+        (s, pos)
     }
 }
 
@@ -106,71 +92,75 @@ impl Iterator for CssTokenizer {
     type Item = CssToken;
 
     fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            if self.pos > self.input.len() {
-                return None;
+        let input = &self.input;
+
+        while self.pos < input.len() {
+            let c = input[self.pos];
+
+            // 空白をスキップ
+            if c.is_whitespace() {
+                self.pos += 1;
+                continue;
             }
 
-            let c = self.input.get(self.pos)?;
-
-
             let token = match c {
-                '(' => CssToken::OpenParenthesis,
-                ')' => CssToken::CloseParenthesis,
-                ',' => CssToken::Delim(','),
-                '.' => CssToken::Delim('.'),
-                ':' => CssToken::Colon,
-                ';' => CssToken::SemiColon,
-                '{' => CssToken::OpenCurly,
-                '}' => CssToken::CloseCurly,
+                '(' => { self.pos += 1; CssToken::OpenParenthesis }
+                ')' => { self.pos += 1; CssToken::CloseParenthesis }
+                ',' => { self.pos += 1; CssToken::Delim(',') }
+                '.' => { self.pos += 1; CssToken::Delim('.') }
+                ':' => { self.pos += 1; CssToken::Colon }
+                ';' => { self.pos += 1; CssToken::SemiColon }
+                '{' => { self.pos += 1; CssToken::OpenCurly }
+                '}' => { self.pos += 1; CssToken::CloseCurly }
                 ' ' | '\n' => {
                     self.pos += 1;
                     continue;
                 }
                 '"' | '\'' => {
-                    let value = self.create_string_token();
-                    CssToken::StringToken(value)
-                },
+                    let (s, next_pos) = Self::consume_string_at(input, self.pos);
+                    self.pos = next_pos + 1;
+                    CssToken::StringToken(s)
+                }
                 '0'..='9' => {
-                    let value = self.create_numeric_token();
-                    self.pos -= 1;
-                    CssToken::Number(value)
-                },
+                    let (num, next_pos) = Self::consume_numeric_at(input, self.pos);
+                    self.pos = next_pos;
+                    CssToken::Number(num)
+                }
                 '#' => {
-                    let value = self.create_ident_token();
-                    self.pos -= 1;
-                    CssToken::HashToken(value)
+                    let (ident, next_pos) = Self::consume_ident_at(input, self.pos);
+                    self.pos = next_pos;
+                    CssToken::HashToken(ident)
                 }
                 '-' => {
-                    let value = self.create_ident_token();
-                    self.pos -= 1;
-                    CssToken::Ident(value)
+                    let (ident, next_pos) = Self::consume_ident_at(input, self.pos);
+                    self.pos = next_pos;
+                    CssToken::Ident(ident)
                 }
                 '@' => {
-                    if self.input[self.pos + 1].is_ascii_alphabetic()
-                    && self.input[self.pos + 2].is_alphanumeric()
-                    && self.input[self.pos + 3].is_alphabetic() {
-                        self.pos += 1;
-                        let value = self.create_ident_token();
-                        self.pos -= 1;
-                        CssToken::AtKeyword(value)
+                    // 次が英字なら at-keyword
+                    if input.get(self.pos + 1).map(|c| c.is_ascii_alphabetic()).unwrap_or(false) {
+                        let (ident, next_pos) = Self::consume_ident_at(input, self.pos + 1);
+                        self.pos = next_pos;
+                        CssToken::AtKeyword(ident)
                     } else {
+                        self.pos += 1;
                         CssToken::Delim('@')
                     }
                 }
-                'a'..='z' | 'A'..='Z' | '_' => {
-                    let value = self.create_ident_token();
-                    self.pos -= 1;
-                    CssToken::Ident(value)
+                c if c.is_ascii_alphabetic() || c == '_' => {
+                    let (ident, next_pos) = Self::consume_ident_at(input, self.pos);
+                    self.pos = next_pos;
+                    CssToken::Ident(ident)
                 }
                 _ => {
                     unimplemented!("char {} is not supported yet", c)
                 }
             };
 
-            self.pos += 1;
             return Some(token);
         }
+
+        None
     }
 }
 
