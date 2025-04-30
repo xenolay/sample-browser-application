@@ -35,7 +35,7 @@ impl CssTokenizer {
         let mut pos = start + 1;
         while pos < input.len() {
             let c = input[pos];
-            if c == ending { break; }
+            if c == ending { pos += 1; break; }
             s.push(c);
             pos += 1;
         }
@@ -118,7 +118,7 @@ impl Iterator for CssTokenizer {
                 }
                 '"' | '\'' => {
                     let (s, next_pos) = Self::scan_string_at(input, self.pos);
-                    self.pos = next_pos + 1;
+                    self.pos = next_pos;
                     CssToken::StringToken(s)
                 }
                 '0'..='9' => {
