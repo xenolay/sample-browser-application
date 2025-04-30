@@ -29,7 +29,7 @@ impl CssTokenizer {
     }
 
     // 文字列トークンを [start] の引用符でスキャンし、閉じ引用符の位置を返す
-    fn consume_string_at(input: &[char], start: usize) -> (String, usize) {
+    fn scan_string_at(input: &[char], start: usize) -> (String, usize) {
         let ending = input[start];
         let mut s = String::new();
         let mut pos = start + 1;
@@ -43,7 +43,7 @@ impl CssTokenizer {
     }
 
     // 数値トークンを [start] からスキャンし、終端位置を返す
-    fn consume_numeric_at(input: &[char], start: usize) -> (f64, usize) {
+    fn scan_numeric_at(input: &[char], start: usize) -> (f64, usize) {
         let mut num = 0f64;
         let mut floating = false;
         let mut factor = 1f64;
@@ -72,7 +72,7 @@ impl CssTokenizer {
     }
 
     // 識別子トークンを [start] からスキャンし、終端位置を返す
-    fn consume_ident_at(input: &[char], start: usize) -> (String, usize) {
+    fn scan_ident_at(input: &[char], start: usize) -> (String, usize) {
         let mut s = String::new();
         let mut pos = start;
         while pos < input.len() {
@@ -117,29 +117,29 @@ impl Iterator for CssTokenizer {
                     continue;
                 }
                 '"' | '\'' => {
-                    let (s, next_pos) = Self::consume_string_at(input, self.pos);
+                    let (s, next_pos) = Self::scan_string_at(input, self.pos);
                     self.pos = next_pos + 1;
                     CssToken::StringToken(s)
                 }
                 '0'..='9' => {
-                    let (num, next_pos) = Self::consume_numeric_at(input, self.pos);
+                    let (num, next_pos) = Self::scan_numeric_at(input, self.pos);
                     self.pos = next_pos;
                     CssToken::Number(num)
                 }
                 '#' => {
-                    let (ident, next_pos) = Self::consume_ident_at(input, self.pos);
+                    let (ident, next_pos) = Self::scan_ident_at(input, self.pos);
                     self.pos = next_pos;
                     CssToken::HashToken(ident)
                 }
                 '-' => {
-                    let (ident, next_pos) = Self::consume_ident_at(input, self.pos);
+                    let (ident, next_pos) = Self::scan_ident_at(input, self.pos);
                     self.pos = next_pos;
                     CssToken::Ident(ident)
                 }
                 '@' => {
                     // 次が英字なら at-keyword
                     if input.get(self.pos + 1).map(|c| c.is_ascii_alphabetic()).unwrap_or(false) {
-                        let (ident, next_pos) = Self::consume_ident_at(input, self.pos + 1);
+                        let (ident, next_pos) = Self::scan_ident_at(input, self.pos + 1);
                         self.pos = next_pos;
                         CssToken::AtKeyword(ident)
                     } else {
@@ -148,7 +148,7 @@ impl Iterator for CssTokenizer {
                     }
                 }
                 c if c.is_ascii_alphabetic() || c == '_' => {
-                    let (ident, next_pos) = Self::consume_ident_at(input, self.pos);
+                    let (ident, next_pos) = Self::scan_ident_at(input, self.pos);
                     self.pos = next_pos;
                     CssToken::Ident(ident)
                 }
