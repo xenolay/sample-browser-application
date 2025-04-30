@@ -1,6 +1,6 @@
 use core::iter::Peekable;
 
-use alloc::{string::String, vec::Vec};
+use alloc::{string::{String, ToString}, vec::Vec};
 
 use super::token::{CssToken, CssTokenizer};
 
@@ -12,6 +12,97 @@ pub struct CssParser {
 impl CssParser {
     pub fn new(tokenizer: CssTokenizer) -> Self {
         Self { tokenizer: tokenizer.peekable() }
+    }
+
+    pub fn parse_stylesheet(&mut self) -> StyleSheet {
+        let mut sheet = StyleSheet::new();
+        sheet.set_rules(self.consume_list_of_rules());
+        sheet
+    }
+
+    fn consume_list_of_rules(&mut self) -> Vec<QualifiedRule> {
+        let mut rules = Vec::new();
+
+        loop {
+            let token = match self.tokenizer.peek() {
+                Some(t) => t,
+                None => return rules,
+            };
+
+            match token {
+                CssToken::AtKeyword(_keyword) => {
+                    let _rule = self.consume_qualified_rule();
+                }
+                _ => {
+                    let rule = self.consume_qualified_rule();
+                    match rule {
+                        Some(r) => rules.push(r),
+                        None => return rules,
+                    }
+                }
+            }
+        }
+    }
+
+    fn consume_qualified_rule(&mut self) -> Option<QualifiedRule> {
+        let mut rule = QualifiedRule::new();
+
+        loop {
+            let token = match self.tokenizer.peek() {
+                Some(t) => t,
+                None => return None,
+            };
+
+            match token {
+                CssToken::OpenCurly => {
+                    assert_eq!(self.tokenizer.next(), Some(CssToken::OpenCurly));
+                    rule.set_declarations(self.consume_list_of_declarations());
+                    return Some(rule);
+                }
+                _ => {
+                    rule.set_selector(self.consume_selector());
+                }
+            }
+        }
+    }
+
+    fn consume_selector(&mut self) -> Selector {
+        let token = match self.tokenizer.next() {
+            Some(t) => t,
+            None => panic!("should have a token but got None"),
+        };
+
+        match token {
+            CssToken::HashToken(value) => Selector::IdSelector(value[1..].to_string()),
+            CssToken::Delim(delim) => {
+                if delim == '.' {
+                    return Selector::ClassSelector(self.consume_ident());
+                }
+                panic!("Parse error: {:?} is an unexpected token.", token);
+            },
+            CssToken::Ident(ident) => {
+                // a:hover のようなセレクタをタイプセレクタとして解釈する
+                if self.tokenizer.peek() == Some(&CssToken::Colon) {
+                    while self.tokenizer.peek() != Some(&CssToken::OpenCurly) {
+                        self.tokenizer.next();
+                    }
+                }
+
+                Selector::TypeSelector(ident.to_string())
+            },
+            CssToken::AtKeyword(_keyword) => {
+                // @ ではじまるルールはサポートしないので、宣言ブロックの開始直前まで読み捨てる
+                while self.tokenizer.peek() != Some(&CssToken::OpenCurly) {
+                    self.tokenizer.next();
+                }
+
+                Selector::UnknownSelector
+            },
+            _ => {
+                self.tokenizer.next();
+                Selector::UnknownSelector
+            }
+        }
     }
 }
 
@@ -35,8 +126,8 @@ pub struct QualifiedRule {
 }
 
 impl QualifiedRule {
-    pub fn new(selector: Selector, declarations: Vec<Declaration>) -> Self {
-        Self { selector, declarations }
+    pub fn new() -> Self {
+        Self { selector: Selector::TypeSelector("".to_string()), declarations: Vec::new() }
     }
 
     pub fn set_selector(&mut self, selector: Selector) {
