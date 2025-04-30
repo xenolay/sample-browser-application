@@ -28,7 +28,7 @@ impl CssTokenizer {
         Self { pos: 0, input: css.chars().collect() }
     }
 
-    fn consume_string_token(&mut self) -> String {
+    fn create_string_token(&mut self) -> String {
         let mut s = String::new();
 
         loop {
@@ -48,7 +48,7 @@ impl CssTokenizer {
         s
     }
 
-    fn consume_numeric_token(&mut self) -> f64 {
+    fn create_numeric_token(&mut self) -> f64 {
         let mut num = 0f64;
         let mut floating = false;
         let mut floating_digit = 1f64;
@@ -83,7 +83,7 @@ impl CssTokenizer {
         num
     }
 
-    fn consume_ident_token(&mut self) -> String {
+    fn create_ident_token(&mut self) -> String {
         let mut s = String::new();
         s.push(self.input[self.pos]);
 
@@ -128,21 +128,21 @@ impl Iterator for CssTokenizer {
                     continue;
                 }
                 '"' | '\'' => {
-                    let value = self.consume_string_token();
+                    let value = self.create_string_token();
                     CssToken::StringToken(value)
                 },
                 '0'..='9' => {
-                    let value = self.consume_numeric_token();
+                    let value = self.create_numeric_token();
                     self.pos -= 1;
                     CssToken::Number(value)
                 },
                 '#' => {
-                    let value = self.consume_ident_token();
+                    let value = self.create_ident_token();
                     self.pos -= 1;
                     CssToken::HashToken(value)
                 }
                 '-' => {
-                    let value = self.consume_ident_token();
+                    let value = self.create_ident_token();
                     self.pos -= 1;
                     CssToken::Ident(value)
                 }
@@ -151,7 +151,7 @@ impl Iterator for CssTokenizer {
                     && self.input[self.pos + 2].is_alphanumeric()
                     && self.input[self.pos + 3].is_alphabetic() {
                         self.pos += 1;
-                        let value = self.consume_ident_token();
+                        let value = self.create_ident_token();
                         self.pos -= 1;
                         CssToken::AtKeyword(value)
                     } else {
@@ -159,7 +159,7 @@ impl Iterator for CssTokenizer {
                     }
                 }
                 'a'..='z' | 'A'..='Z' | '_' => {
-                    let value = self.consume_ident_token();
+                    let value = self.create_ident_token();
                     self.pos -= 1;
                     CssToken::Ident(value)
                 }
