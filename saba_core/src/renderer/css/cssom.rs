@@ -104,6 +104,72 @@ impl CssParser {
             }
         }
     }
+
+    fn consume_list_of_declarations(&mut self) -> Vec<Declaration> {
+        let mut declarations = Vec::new();
+
+        loop {
+            let token = match self.tokenizer.peek() {
+                Some(t) => t,
+                None => return declarations
+            };
+
+            match token {
+                CssToken::CloseCurly => {
+                    assert_eq!(self.tokenizer.next(), Some(CssToken::CloseCurly));
+                    return declarations;
+                }
+                CssToken::SemiColon => {
+                    assert_eq!(self.tokenizer.next(), Some(CssToken::SemiColon));
+                }
+                CssToken::Ident(ref _ident) => {
+                    if let Some(declaration) = self.consume_declaration() {
+                        declarations.push(declaration);
+                    }
+                }
+                _ => {
+                    self.tokenizer.next();
+                }
+            }
+        }
+    }
+
+    fn consume_declaration(&mut self) -> Option<Declaration> {
+        if self.tokenizer.peek().is_none() {
+            return None;
+        }
+
+        let mut declaration = Declaration::new();
+        declaration.set_property(self.consume_ident());
+
+        match self.tokenizer.next() {
+            Some(token) => match token {
+                CssToken::Colon => {}, // declaration は property : value の形をしているはずなのでコロン以外が来たらおかしい
+                _ => return None,
+            },
+            None => return None,
+        }
+
+        declaration.set_value(self.consume_component_value());
+
+        Some(declaration)
+    }
+
+    fn consume_ident(&mut self) -> String {
+        let token = match self.tokenizer.next() {
+            Some(t) => t,
+            None => panic!("should have a token but got None")
+        };
+
+        match token {
+            CssToken::Ident(i) => i,
+            _ => panic!("Parse error: {:?} is an unexpected token.", token)
+        }
+    }
+
+    fn consume_component_value(&mut self) -> CssToken {
+        self.tokenizer.next().expect("should have a token in consume_component_value")
+    }
 }
 
 pub struct StyleSheet {
